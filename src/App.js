@@ -1,128 +1,201 @@
-import React, { useState } from 'react';
-import './App.css';
+import React, { useState } from "react";
+import { OpenAI } from "openai";
+import { motion, AnimatePresence } from "framer-motion";
+import brand from "./brandConfig";
+import "./App.css";
+
+// 🔍 Match symptoms to product keywords using fuzzy matching
+const isSimilar = (input, keyword) => {
+  return input.toLowerCase().includes(keyword.toLowerCase()) ||
+         keyword.toLowerCase().includes(input.toLowerCase());
+};
+
+// 🧠 Get recommended products based on user symptoms
+const getProductRecommendations = (userSymptoms) => {
+  return brand.products.filter(product =>
+    product.keywords.some(keyword =>
+      userSymptoms.some(symptom => isSimilar(symptom, keyword))
+    )
+  );
+};
+
+// 🔗 Format product results as markdown links for chatbot replies
+const formatProductLinks = (products) =>
+  products
+    .map(
+      (product) =>
+        `- **[${product.name}](${product.link})** – ${product.description}`
+    )
+    .join("\n");
+
+const openai = new OpenAI({
+  apiKey: process.env.REACT_APP_OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true,
+});
 
 function App() {
   const [messages, setMessages] = useState([
-    {
-      sender: 'bot',
-      text: "Welcome! I’m TrueBiome.AI — your personal gut health assistant. What symptoms are you currently experiencing?"
-    }
+    { role: "assistant", content: brand.greeting }
   ]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [followUpCount, setFollowUpCount] = useState(0);
 
-  const systemPrompt = `You are "TrueBiome.AI", a highly intelligent and empathetic AI assistant specializing in gut health, functional medicine, and environmental detox. Your purpose is to help people understand the root causes of their symptoms and confidently guide them toward supplement-based solutions from the host company's product catalog.
+  const chatWindowRef = React.useRef(null);
 
-Always speak with warmth, professionalism, and encouragement. Be clear, helpful, and conversational — like a compassionate, expert-level functional medicine clinician.
+  React.useEffect(() => {
+    if (chatWindowRef.current) {
+      chatWindowRef.current.scrollTo({
+        top: chatWindowRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [messages]);
 
----
-
-Start every conversation with a kind, intelligent greeting like:
-"Hi there — I’m TrueBiome.AI, your personal gut health assistant. I’d love to hear what symptoms you’ve been experiencing so I can point you in the right direction."
-
----
-
-Once the user describes their symptoms, always:
-- Respond with empathy and clarity
-- Ask relevant follow-up questions to better understand the situation:
-  - How long have you been dealing with this?
-  - Have you noticed specific triggers like food or environment (mold, stress, etc.)?
-  - What are your top wellness goals right now?
-
----
-
-Based on the user's input, intelligently recommend 1–2 of the following products. Each recommendation must:
-- Clearly name the product
-- Briefly explain WHY it's being recommended
-- Speak to the user's symptoms in natural language
-- Invite the user to learn more or ask follow-up questions
-
----
-
-Product Catalog (Biocidin brand):
-
-1. **Bioclear™ Microbiome Detox Program**  
-   30-day gut + liver detox protocol designed to address GI symptoms, abdominal pain, brain fog, bloating, gas, indigestion, constipation, and diarrhea.
-
-2. **Liver GB+™**  
-   Supports sluggish digestion, liver overload, nausea, constipation, and side effects from GLP-1 medications. Ideal for individuals with poor bile flow or fat digestion.
-
-3. **Biocidin® Capsules**  
-   Broad-spectrum botanical blend that targets harmful microbes in the gut, improves digestion, relieves bloating and gas, and supports immune function.
-
-4. **Olivirex®**  
-   A potent olive leaf-based formula that activates detox pathways (liver + kidneys), supports immune balance, and helps individuals recovering from chronic conditions or mold exposure.
-
----
-
-Tone Guidelines:
-- Be confident but never pushy.
-- Speak to the user like they’re someone you genuinely want to help.
-- Keep answers short and to-the-point unless the user asks for detail.
-- Always invite a next step (e.g., “Would you like help creating a simple supplement routine?” or “Want to learn how to use it?”)
-
-If a user sends something unrelated or inappropriate, gently redirect with:
-"I'm here to support your gut health and wellness journey — feel free to ask me about symptoms, supplements, or detox support!"
-
-Your goal is to convert curious visitors into confident buyers — by making them feel seen, supported, and ready to take the next step toward healing.`;
 
   const sendMessage = async () => {
     if (!input.trim()) return;
 
-    const newMessages = [...messages, { sender: 'user', text: input }];
+    const newMessages = [...messages, { role: "user", content: input }];
     setMessages(newMessages);
-    setInput('');
+    setInput("");
+    setLoading(true);
+
+    const productList = brand.products
+      .map(
+        (p) =>
+          `- **${p.name}** – ${p.description}. [Buy ${p.name}](${p.link})`
+      )
+      .join("\n");
+      
+const systemPrompt = `
+You are ${brand.name}, an intelligent gut health assistant trained in functional medicine principles.
+
+You specialize in helping people understand root causes of symptoms like bloating, gas, brain fog, fatigue, constipation, diarrhea, sugar cravings, mood swings, and more — using the product list below.
+
+Your job is to:
+1. Ask **1–2 short follow-up questions** based on the user’s symptoms to gather clarity. Be specific to their symptom category. For example:
+   - Bloating/gas: “Do you notice it’s worse after certain foods?” or “How soon after eating does it start?”
+   - Fatigue/brain fog: “Do you feel tired even after a full night’s sleep?”
+   - Constipation/diarrhea: “How often are your bowel movements?”
+   - Cravings/mood: “Do you feel more anxious or down after eating sugar?”
+
+2. Then recommend **products ONLY from this list**, based on their symptoms and answers. For each product:
+   - Explain in simple terms what it does
+   - How it helps
+   - Use markdown: [Buy ProductName](link)
+
+3. After the recommendation, always ask a **final engaging question** like:
+   - “Would you like me to build a full gut support protocol?”
+   - “Want to look at common causes of this symptom?”
+   - “Would you like diet tips that may help?”
+
+🧠 Tone: Calm, clear, confident — like a knowledgeable functional medicine coach. Never apologize, never say “I understand.” Just be smart, caring, and direct.
+
+💡 Be conversational. Break longer responses into **2–4 short chatbot-style messages**, with line breaks if helpful.
+
+🌿 Available Products:
+${productList}
+
+Keep it friendly, helpful, and forward-moving. You're here to *guide the user to root causes and recommend the most relevant product(s)*.
+`;
+
 
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...newMessages.map(msg => ({
-              role: msg.sender === 'bot' ? 'assistant' : 'user',
-              content: msg.text
-            }))
-          ]
-        })
+      const response = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...newMessages,
+        ],
+        temperature: 0.7,
       });
 
-      const data = await res.json();
-      const botMessage = data.choices?.[0]?.message?.content;
-
-      if (botMessage) {
-        setMessages(prev => [...prev, { sender: 'bot', text: botMessage }]);
-      } else {
-        setMessages(prev => [...prev, { sender: 'bot', text: "Sorry, something went wrong." }]);
-      }
+      const botMessage = response.choices[0].message.content;
+      setMessages([
+        ...newMessages,
+        { role: "assistant", content: botMessage },
+      ]);
+      setFollowUpCount(followUpCount + 1);
     } catch (error) {
-      console.error('Error:', error);
-      setMessages(prev => [...prev, { sender: 'bot', text: "Error contacting the AI." }]);
+      console.error("OpenAI API error:", error);
+      setMessages([
+        ...newMessages,
+        {
+          role: "assistant",
+          content: "Oops, something went wrong. Please try again later.",
+        },
+      ]);
     }
+
+    setLoading(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") sendMessage();
   };
 
   return (
-    <div className="chat-container">
-      <div className="chat-box">
-        {messages.map((msg, i) => (
-          <div key={i} className={`chat-message ${msg.sender}`}>
-            {msg.text}
-          </div>
-        ))}
-      </div>
-      <div className="chat-input">
+    <div className="app">
+      <AnimatePresence>
+        <motion.div
+  className="chat-window"
+  ref={chatWindowRef}
+  initial={{ opacity: 0, y: 40 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ type: "spring", stiffness: 60, damping: 10 }}
+>
+
+          {messages.map((msg, i) => (
+            <motion.div
+              key={i}
+              className={`message ${msg.role}`}
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: i * 0.05, type: "spring", stiffness: 50 }}
+            >
+              <span
+                dangerouslySetInnerHTML={{
+                  __html: msg.content.replace(/\n/g, "<br/>"),
+                }}
+              />
+            </motion.div>
+          ))}
+
+          {loading && (
+            <motion.div
+              className="message assistant typing-dots"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <span className="dot" />
+              <span className="dot" />
+              <span className="dot" />
+            </motion.div>
+          )}
+        </motion.div>
+      </AnimatePresence>
+
+      <motion.div
+        className="input-area"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.8, duration: 0.4 }}
+      >
         <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && sendMessage()}
+          type="text"
           placeholder="Type your symptoms here..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
         />
-        <button onClick={sendMessage}>Send</button>
-      </div>
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={sendMessage}
+        >
+          Send
+        </motion.button>
+      </motion.div>
     </div>
   );
 }
