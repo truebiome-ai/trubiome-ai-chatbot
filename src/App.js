@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { OpenAI } from "openai";
 import { motion, AnimatePresence } from "framer-motion";
-import brand from "./brandConfig";
+import brand from "./brands/universal";
 import "./App.css";
 
 // 🔍 Match symptoms to product keywords using fuzzy matching
