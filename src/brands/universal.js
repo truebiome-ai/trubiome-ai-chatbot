@@ -5,7 +5,7 @@ const brand = {
   description:
     "a friendly, educational AI trained to help users choose high-quality supplements based on symptoms using a functional medicine approach.",
   greeting:
-    "Welcome! I’m TrueBiome.AI — an AI-driven wellness assistant here to guide you. What symptoms are you currently experiencing?",
+    "Welcome! I’m TruBiome.AI — your personalized wellness assistant. What are you currently struggling with or hoping to improve?",
   products: [
     {
       name: "Your brand’s L-glutamine",

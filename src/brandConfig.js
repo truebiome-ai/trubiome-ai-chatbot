@@ -1,7 +1,7 @@
 const brand = {
   name: "TruBiome.AI",
   description: "a friendly, product-focused assistant trained to recommend only Biocidin Botanicals supplements based on symptoms.",
-  greeting: "Welcome! I’m TruBiome.AI — your personal gut health assistant. What symptoms are you currently experiencing?",
+  greeting: "Welcome! I’m TruBiome.AI — your personalized wellness assistant. What are you currently struggling with or hoping to improve?",
   products: [
     {
       name: "Biocidin® Capsules",
