@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState } from "react";
 import { OpenAI } from "openai";
 import { motion, AnimatePresence } from "framer-motion";
