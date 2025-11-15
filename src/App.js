@@ -21,7 +21,7 @@ const getProductRecommendations = (userSymptoms) => {
   );
 };
 
-// 🔗 Format product results as markdown links for chatbot replies
+// 🔗 Format produuct results as markdown links for chatbot replies
 const formatProductLinks = (products) =>
   products
     .map(
